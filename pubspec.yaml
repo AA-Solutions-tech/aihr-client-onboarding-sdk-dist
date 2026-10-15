@@ -1,0 +1,24 @@
+name: aihr_client_onboarding_sdk
+description: >
+  Flutter widget for the NizamyAI client onboarding assistant. It renders the
+  hosted onboarding chat page in a WebView and hands the host app's access
+  token and language to it. Built for the Nizamy app; not a generic package.
+version: 0.1.0
+publish_to: 'none'
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+  flutter: '>=3.16.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_inappwebview: ^6.0.0
+  geocoding: ^5.0.0
+  geolocator: ^14.1.1
+  local_auth: ^3.0.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
