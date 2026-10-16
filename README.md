@@ -14,7 +14,7 @@ dependencies:
   aihr_client_onboarding_sdk:
     git:
       url: https://github.com/AA-Solutions-tech/aihr-client-onboarding-sdk-dist.git
-      ref: v0.1.0
+      ref: v0.1.1
 ```
 
 ```dart

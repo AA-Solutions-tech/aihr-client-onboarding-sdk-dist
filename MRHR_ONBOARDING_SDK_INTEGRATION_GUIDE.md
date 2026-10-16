@@ -39,9 +39,11 @@ Nothing else — no WebView setup, no JS bridge — is exposed.
   works on any machine (developer laptops and CI).
 - **Platform minimums.** The SDK depends on `flutter_inappwebview ^6.0.0`,
   `geolocator ^14.1.1`, `geocoding ^5.0.0` and `local_auth ^3.0.2`. It is
-  tested on **iOS 13.0+** and Android with **Android Gradle Plugin 8.9.1 or
-  newer** (needed by `androidx.core` 1.18). If your app targets lower, raise
-  these (verify exact values against those packages' docs).
+  tested on **iOS 13.0+** and Android with **Android Gradle Plugin 8.9.1**
+  (verified; `androidx.core` 1.18 needs 8.9.1 or newer). **AGP 9.x, the default
+  in new Flutter 3.44 projects, currently fails to build** because of
+  `flutter_inappwebview_android` — see Section 4c. If your app targets lower,
+  raise these (verify exact values against those packages' docs).
 
 ---
 
@@ -54,7 +56,7 @@ dependencies:
   aihr_client_onboarding_sdk:
     git:
       url: https://github.com/AA-Solutions-tech/aihr-client-onboarding-sdk-dist.git
-      ref: v0.1.0        # pin an exact version — do not use a branch
+      ref: v0.1.1        # pin an exact version — do not use a branch
 ```
 
 Then:
@@ -98,8 +100,12 @@ import io.flutter.embedding.android.FlutterFragmentActivity
 class MainActivity : FlutterFragmentActivity()
 ```
 
-**c.** Use Android Gradle Plugin **8.9.1 or newer** (in `android/settings.gradle`
-or `android/build.gradle`).
+**c.** Use Android Gradle Plugin **8.9.1**: set the `com.android.application`
+plugin version in `android/settings.gradle.kts` (new projects) or
+`android/settings.gradle` / `android/build.gradle` (older ones). New Flutter 3.44
+projects default to AGP 9.x, which currently fails with
+`flutter_inappwebview_android` (`getDefaultProguardFile('proguard-android.txt')
+is no longer supported`).
 
 ### iOS
 
@@ -302,7 +308,7 @@ Navigator.of(context).push(
 | **Location step fails / no permission prompt** | Missing location permissions (Section 4a) or `NSLocationWhenInUseUsageDescription` (iOS), or the owner denied location. |
 | **"Session expired" right after company creation** | `refreshToken` or `apiBaseUrl` missing or not `https`, so the SDK could not renew the token. |
 | **Chat refuses the session immediately** | `apiBaseUrl` is not an MRHR server our backend knows, or the access token is invalid/expired. |
-| **Build fails on Android** | Android Gradle Plugin older than 8.9.1, or min SDK too low (Section 2). |
+| **Build fails on Android** | Android Gradle Plugin older than 8.9.1 or 9.x (Section 4c), or min SDK too low (Section 2). |
 
 ---
 

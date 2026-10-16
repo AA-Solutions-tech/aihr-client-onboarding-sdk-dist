@@ -13,7 +13,7 @@ import 'token_refresh.dart';
 /// development with `--dart-define=AIHR_ONBOARDING_BASE_URL=...`.
 const String _kBaseUrl = String.fromEnvironment(
   'AIHR_ONBOARDING_BASE_URL',
-  defaultValue: 'https://hr.aasolutions.tech/HR/aihr-client-onboarding-app',
+  defaultValue: 'https://hr.aasolutions.tech/HR/aihr-client-onboarding-app/',
 );
 
 /// 'ar' only for an explicit Arabic code; everything else is English.
