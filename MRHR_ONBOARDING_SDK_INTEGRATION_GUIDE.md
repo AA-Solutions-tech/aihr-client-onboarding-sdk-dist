@@ -16,9 +16,11 @@ up their company.
 onboarding chat inside a WebView and bridges the owner's session and a few phone
 features into it. Your app owns login; the SDK keeps tokens in memory only.
 
-In the chat the new owner sets up: company details, work location, the first
-check-in (with fingerprint or face), team invites, shifts and leave types. When
-they finish, the SDK tells your app so it can open the dashboard.
+In the chat the new owner sets up, in this order: their name, the company,
+the work location, their fingerprint, team invites, shifts, leave types, a first
+check-in and check-out (with the fingerprint), and notifications. Nizamy's
+reward points are shown as each step is completed. When they finish, the SDK
+tells your app so it can open the dashboard.
 
 - **You provide:** the owner's access token and refresh token from your native
   login, the MRHR server they logged in to, and the phone's device id.
@@ -56,7 +58,7 @@ dependencies:
   aihr_client_onboarding_sdk:
     git:
       url: https://github.com/AA-Solutions-tech/aihr-client-onboarding-sdk-dist.git
-      ref: v0.1.1        # pin an exact version — do not use a branch
+      ref: v0.2.0        # pin an exact version — do not use a branch
 ```
 
 Then:
@@ -68,7 +70,7 @@ flutter pub get
 > `flutter_inappwebview`, `geolocator`, `geocoding` and `local_auth` come in
 > automatically as transitive dependencies — you don't add them yourself.
 
-**Upgrading later:** bump `ref:` to the new tag (e.g. `v0.2.0`) and run
+**Upgrading later:** bump `ref:` to the new tag (e.g. `v0.3.0`) and run
 `flutter pub get` again. Versions are immutable — a given tag always resolves
 to the same build.
 
@@ -78,7 +80,7 @@ to the same build.
 
 The chat loads from our servers over `https://` — no network configuration is
 needed. The SDK does use the phone's location and biometrics (for the work
-location and the first check-in), and a Flutter package cannot add these
+location, the fingerprint step and the first check-in and check-out), and a Flutter package cannot add these
 permissions to your app — they are one-time edits in your project.
 
 ### Android
@@ -115,7 +117,7 @@ Add to `ios/Runner/Info.plist`:
 <key>NSLocationWhenInUseUsageDescription</key>
 <string>Your location sets where your team checks in.</string>
 <key>NSFaceIDUsageDescription</key>
-<string>Face ID verifies it is you when you check in.</string>
+<string>Face ID verifies it is you for attendance.</string>
 ```
 
 > **Skip the location entries and the work-location and check-in steps fail.**
@@ -212,27 +214,53 @@ owner back to login, then open onboarding again with the new tokens.
 ### `deviceId` — required
 
 Pass **the same device id your app sends to MRHR's
-`POST /api/account/register-fingerprint`**. During the first check-in, after the
-owner passes the phone's fingerprint or face prompt, the SDK registers the
-fingerprint with this id. That is what activates the owner's account on MRHR —
-and MRHR only lets an **active** owner invite their team. Without `deviceId`,
-check-in still works but the team invite step is refused.
+`POST /api/account/register-fingerprint`**. The chat has a fingerprint step
+right after the work location: the owner passes the phone's fingerprint or face
+prompt, and the SDK registers the fingerprint with this id. The same
+fingerprint is then used for the first check-in and check-out later in the
+chat. Registering it is what activates the owner's account on MRHR — and MRHR
+only lets an **active** owner invite their team. Without `deviceId`, the
+fingerprint step cannot register (the owner can only skip it), so MRHR keeps
+the owner inactive and the team invite step is refused.
+
+**One id per phone, read at run time.** Pass the value your app works out on
+each phone, never a fixed string: every owner's phone then registers under its
+own id, and your app's later check-ins from that phone match it. Use the same
+source your app already uses for `register-fingerprint` (for example a random
+id created on first launch and kept in secure storage / the Keychain, or the
+platform id). The SDK only forwards this value; it never creates or stores one.
 
 ### `pushRegistration` — optional
 
-Push belongs to your app (Firebase and the notification permission). Pass a
-function that registers the device and returns the result, or `null` if the
-owner declined:
+The last step of the chat asks the owner whether to turn on notifications for
+attendance reminders. When they say yes, the SDK calls your `pushRegistration`
+function and saves the result with MRHR for the owner.
+
+Push belongs to your app (Firebase and the notification permission), so this
+function is yours. It should ask for the notification permission if your app
+doesn't have it yet (iOS, and Android 13+), then return this phone's push token,
+or `null` if the owner declined:
 
 ```dart
+import 'dart:io' show Platform;
+
 Future<PushRegistration?> registerPush() async {
-  final token = await yourPushService.register();
-  if (token == null) return null;
-  return PushRegistration(token: token, platform: 'android', deviceId: device.id);
+  final token = await yourPushService.register();   // asks permission if needed
+  if (token == null) return null;                    // owner declined
+  return PushRegistration(
+    token: token,
+    platform: Platform.isIOS ? 'ios' : 'android',
+    deviceId: device.id,                             // same id as Section 7
+  );
 }
 ```
 
-Without it, the notifications option in the chat shows as unavailable.
+Then pass it to the widget: `pushRegistration: registerPush,`.
+
+If it returns `null`, the chat says notifications stay off and finishes the
+setup. Without `pushRegistration`, the notifications step is skipped the same
+way. If your app already asked for the permission and has a token, just return
+it — no dialog appears.
 
 ---
 
@@ -308,7 +336,7 @@ Navigator.of(context).push(
 | **Location step fails / no permission prompt** | Missing location permissions (Section 4a) or `NSLocationWhenInUseUsageDescription` (iOS), or the owner denied location. |
 | **"Session expired" right after company creation** | `refreshToken` or `apiBaseUrl` missing or not `https`, so the SDK could not renew the token. |
 | **Chat refuses the session immediately** | `apiBaseUrl` is not an MRHR server our backend knows, or the access token is invalid/expired. |
-| **Build fails on Android** | Android Gradle Plugin older than 8.9.1 or 9.x (Section 4c), or min SDK too low (Section 2). |
+| **Build fails on Android** | Android Gradle Plugin older than 8.9.1 or 9.x (Section 4c), or your app is below the platform minimums of the SDK's dependencies (Section 2). |
 
 ---
 
