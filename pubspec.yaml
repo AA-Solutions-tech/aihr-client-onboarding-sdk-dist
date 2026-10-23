@@ -3,7 +3,7 @@ description: >
   Flutter widget for the NizamyAI client onboarding assistant. It renders the
   hosted onboarding chat page in a WebView and hands the host app's access
   token and language to it. Built for the Nizamy app; not a generic package.
-version: 0.1.1
+version: 0.2.0
 publish_to: 'none'
 
 environment:

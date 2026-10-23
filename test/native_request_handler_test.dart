@@ -113,6 +113,45 @@ void main() {
     });
   });
 
+  group('register_fingerprint', () {
+    test('asks only for the biometric and returns the device id', () async {
+      final location = _FakeLocation([_here]);
+      final biometric = _FakeBiometric(BiometricOutcome.verified);
+      final handler = NativeRequestHandler(location: location, biometric: biometric, deviceId: ' phone-1 ');
+      final result = await handler.handle({
+        'kind': 'register_fingerprint',
+        'params': {'reason': 'Register your fingerprint'},
+      });
+      expect(result, {'ok': true, 'deviceId': 'phone-1'});
+      expect(biometric.lastReason, 'Register your fingerprint');
+      expect(location._calls, 0);
+    });
+
+    test('works with location turned off', () async {
+      final result = await _handler(
+        location: _FakeLocation([_here], failure: LocationFailure.permissionDenied),
+        deviceId: 'phone-1',
+      ).handle({'kind': 'register_fingerprint'});
+      expect(result['ok'], true);
+    });
+
+    test('never returns the device id without a verified fingerprint', () async {
+      for (final entry in {
+        BiometricOutcome.noMatch: 'no_match',
+        BiometricOutcome.notEnrolled: 'not_enrolled',
+        BiometricOutcome.unavailable: 'unavailable',
+      }.entries) {
+        final result = await _handler(outcome: entry.key, deviceId: 'phone-1').handle({'kind': 'register_fingerprint'});
+        expect(result, {'ok': false, 'error': entry.value});
+      }
+    });
+
+    test('reports a host that gave no device id', () async {
+      final result = await _handler().handle({'kind': 'register_fingerprint'});
+      expect(result, {'ok': false, 'error': 'no_device_id'});
+    });
+  });
+
   group('check_in', () {
     test('passes inside the gate when the biometric verifies', () async {
       final result = await _handler().handle({

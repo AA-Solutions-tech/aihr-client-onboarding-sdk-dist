@@ -33,6 +33,8 @@ class NativeRequestHandler {
           return await _getLocation();
         case NativeKind.measureDistance:
           return await _measureDistance(request.params);
+        case NativeKind.registerFingerprint:
+          return await _registerFingerprint(request.params);
         case NativeKind.checkIn:
           return await _checkIn(request.params);
         case NativeKind.enableNotifications:
@@ -106,6 +108,29 @@ class NativeRequestHandler {
         return nativeError('no_match');
       case BiometricOutcome.notEnrolled:
         return nativeError('not_enrolled');
+      case BiometricOutcome.unavailable:
+        return nativeError('unavailable');
+    }
+  }
+
+  /// The fingerprint step on its own: only the phone's biometric prompt, no
+  /// location. Answers with the device id Nizamy's register-fingerprint needs.
+  Future<Map<String, dynamic>> _registerFingerprint(Map<String, dynamic> params) async {
+    final reason = params['reason'] is String ? params['reason'] as String : 'Register your fingerprint';
+    final outcome = await _biometric.verify(reason: reason);
+    if (outcome != BiometricOutcome.verified) return _biometricError(outcome);
+    final id = deviceId?.trim() ?? '';
+    if (id.isEmpty) return nativeError('no_device_id');
+    return nativeOk({'deviceId': id});
+  }
+
+  Map<String, dynamic> _biometricError(BiometricOutcome outcome) {
+    switch (outcome) {
+      case BiometricOutcome.noMatch:
+        return nativeError('no_match');
+      case BiometricOutcome.notEnrolled:
+        return nativeError('not_enrolled');
+      case BiometricOutcome.verified:
       case BiometricOutcome.unavailable:
         return nativeError('unavailable');
     }

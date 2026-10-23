@@ -3,6 +3,7 @@
 enum NativeKind {
   getLocation('get_location'),
   measureDistance('measure_distance'),
+  registerFingerprint('register_fingerprint'),
   checkIn('check_in'),
   enableNotifications('enable_notifications');
 
