@@ -5,7 +5,8 @@ enum NativeKind {
   measureDistance('measure_distance'),
   registerFingerprint('register_fingerprint'),
   checkIn('check_in'),
-  enableNotifications('enable_notifications');
+  enableNotifications('enable_notifications'),
+  openLocationSettings('open_location_settings');
 
   const NativeKind(this.wireName);
 

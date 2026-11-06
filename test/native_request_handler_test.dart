@@ -24,6 +24,15 @@ class _FakeLocation implements LocationProvider {
       ((to.longitude - from.longitude).abs() * 111000);
 }
 
+class _FakeKnownLocation extends _FakeLocation implements LastKnownLocation {
+  _FakeKnownLocation(super.fixes, this.known);
+
+  final DeviceFix? known;
+
+  @override
+  Future<DeviceFix?> lastKnownFix() async => known;
+}
+
 class _FakeBiometric implements BiometricProvider {
   _FakeBiometric(this.outcome);
 
@@ -44,12 +53,14 @@ NativeRequestHandler _handler({
   BiometricOutcome outcome = BiometricOutcome.verified,
   PushRegistrationProvider? push,
   String? deviceId,
+  SettingsOpener? openSettings,
 }) =>
     NativeRequestHandler(
       location: location ?? _FakeLocation([_here], address: 'Al Malqa, Riyadh'),
       biometric: _FakeBiometric(outcome),
       pushRegistration: push,
       deviceId: deviceId,
+      openSettings: openSettings,
     );
 
 void main() {
@@ -81,6 +92,7 @@ void main() {
     test('reports each failure with its own code', () async {
       final expected = {
         LocationFailure.permissionDenied: 'permission_denied',
+        LocationFailure.permissionBlocked: 'permission_blocked',
         LocationFailure.serviceDisabled: 'location_disabled',
         LocationFailure.timeout: 'timeout',
         LocationFailure.failed: 'failed',
@@ -90,6 +102,57 @@ void main() {
         final result = await handler.handle({'kind': 'get_location'});
         expect(result, {'ok': false, 'error': entry.value});
       }
+    });
+  });
+
+  group('get_location fast', () {
+    const known = DeviceFix(latitude: 17.49, longitude: 78.35, accuracy: 30.2);
+
+    test('returns the last known position at once, marked approximate', () async {
+      final handler = _handler(location: _FakeKnownLocation([_here], known));
+      final result = await handler.handle({'kind': 'get_location', 'params': {'fast': true}});
+      expect(result['latitude'], 17.49);
+      expect(result['approximate'], true);
+    });
+
+    test('takes a fresh fix when the phone has no last known position', () async {
+      final handler = _handler(location: _FakeKnownLocation([_here], null));
+      final result = await handler.handle({'kind': 'get_location', 'params': {'fast': true}});
+      expect(result['latitude'], 24.7136);
+      expect(result.containsKey('approximate'), false);
+    });
+
+    test('without fast, always a fresh fix', () async {
+      final handler = _handler(location: _FakeKnownLocation([_here], known));
+      final result = await handler.handle({'kind': 'get_location'});
+      expect(result['latitude'], 24.7136);
+    });
+
+    test('a host provider without last known support gets a fresh fix', () async {
+      final handler = _handler(location: _FakeLocation([_here]));
+      final result = await handler.handle({'kind': 'get_location', 'params': {'fast': true}});
+      expect(result['latitude'], 24.7136);
+    });
+  });
+
+  group('open_location_settings', () {
+    test('opens the app settings by default and the location switch for target service', () async {
+      final opened = <SettingsTarget>[];
+      final handler = _handler(openSettings: (target) async {
+        opened.add(target);
+        return true;
+      });
+      expect(await handler.handle({'kind': 'open_location_settings'}), {'ok': true});
+      expect(
+        await handler.handle({'kind': 'open_location_settings', 'params': {'target': 'service'}}),
+        {'ok': true},
+      );
+      expect(opened, [SettingsTarget.app, SettingsTarget.locationService]);
+    });
+
+    test('reports when the settings page could not be opened', () async {
+      final handler = _handler(openSettings: (_) async => false);
+      expect(await handler.handle({'kind': 'open_location_settings'}), {'ok': false, 'error': 'failed'});
     });
   });
 

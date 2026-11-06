@@ -1,9 +1,20 @@
 import 'package:flutter/foundation.dart';
+import 'package:geolocator/geolocator.dart';
 
 import 'biometric_provider.dart';
 import 'location_provider.dart';
 import 'native_request.dart';
 import 'push_registration.dart';
+
+/// Which settings page `open_location_settings` opens: this app's page (to allow a
+/// blocked location permission) or the phone's location service switch.
+enum SettingsTarget { app, locationService }
+
+typedef SettingsOpener = Future<bool> Function(SettingsTarget target);
+
+Future<bool> _openPhoneSettings(SettingsTarget target) => target == SettingsTarget.app
+    ? Geolocator.openAppSettings()
+    : Geolocator.openLocationSettings();
 
 /// Answers the page's `onNativeRequest` calls. Never throws: every failure
 /// comes back as `{ok: false, error: <code>}` so the page can show a state.
@@ -14,13 +25,16 @@ class NativeRequestHandler {
     BiometricProvider? biometric,
     this.pushRegistration,
     this.deviceId,
+    SettingsOpener? openSettings,
   })  : _location = location ?? const GeolocatorLocationProvider(),
-        _biometric = biometric ?? LocalAuthBiometricProvider();
+        _biometric = biometric ?? LocalAuthBiometricProvider(),
+        _openSettings = openSettings ?? _openPhoneSettings;
 
   final LocationProvider _location;
   final BiometricProvider _biometric;
   final PushRegistrationProvider? pushRegistration;
   final String? deviceId;
+  final SettingsOpener _openSettings;
 
   DeviceFix? _walkStart;
 
@@ -30,7 +44,7 @@ class NativeRequestHandler {
     try {
       switch (request.kind) {
         case NativeKind.getLocation:
-          return await _getLocation();
+          return await _getLocation(fast: request.params['fast'] == true);
         case NativeKind.measureDistance:
           return await _measureDistance(request.params);
         case NativeKind.registerFingerprint:
@@ -39,6 +53,9 @@ class NativeRequestHandler {
           return await _checkIn(request.params);
         case NativeKind.enableNotifications:
           return await _enableNotifications();
+        case NativeKind.openLocationSettings:
+          final target = request.params['target'] == 'service' ? SettingsTarget.locationService : SettingsTarget.app;
+          return await _openSettings(target) ? nativeOk() : nativeError('failed');
       }
     } on LocationUnavailable catch (error) {
       return nativeError(_locationError(error.reason));
@@ -48,14 +65,22 @@ class NativeRequestHandler {
     }
   }
 
-  Future<Map<String, dynamic>> _getLocation() async {
-    final fix = await _location.currentFix();
-    final address = await _location.addressFor(fix.latitude, fix.longitude);
+  /// `fast`: the last known position when the phone has one (marked `approximate`, the page refines it
+  /// with a second call); otherwise, and without `fast`, a fresh fix.
+  Future<Map<String, dynamic>> _getLocation({bool fast = false}) async {
+    final location = _location;
+    DeviceFix? known;
+    if (fast && location is LastKnownLocation) {
+      known = await (location as LastKnownLocation).lastKnownFix();
+    }
+    final fix = known ?? await location.currentFix();
+    final address = await location.addressFor(fix.latitude, fix.longitude);
     return nativeOk({
       'latitude': fix.latitude,
       'longitude': fix.longitude,
       'accuracy': fix.accuracy.round(),
       if (address != null) 'address': address,
+      if (known != null) 'approximate': true,
     });
   }
 
@@ -152,6 +177,8 @@ class NativeRequestHandler {
     switch (reason) {
       case LocationFailure.permissionDenied:
         return 'permission_denied';
+      case LocationFailure.permissionBlocked:
+        return 'permission_blocked';
       case LocationFailure.serviceDisabled:
         return 'location_disabled';
       case LocationFailure.timeout:

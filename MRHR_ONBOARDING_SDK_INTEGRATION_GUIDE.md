@@ -58,7 +58,7 @@ dependencies:
   aihr_client_onboarding_sdk:
     git:
       url: https://github.com/AA-Solutions-tech/aihr-client-onboarding-sdk-dist.git
-      ref: v0.2.0        # pin an exact version — do not use a branch
+      ref: v0.3.0        # pin an exact version — do not use a branch
 ```
 
 Then:
@@ -70,7 +70,7 @@ flutter pub get
 > `flutter_inappwebview`, `geolocator`, `geocoding` and `local_auth` come in
 > automatically as transitive dependencies — you don't add them yourself.
 
-**Upgrading later:** bump `ref:` to the new tag (e.g. `v0.3.0`) and run
+**Upgrading later:** bump `ref:` to the new tag (e.g. `v0.4.0`) and run
 `flutter pub get` again. Versions are immutable — a given tag always resolves
 to the same build.
 
@@ -342,7 +342,7 @@ Navigator.of(context).push(
 
 ## 10. Versioning
 
-- Each release is an immutable tag (`v0.1.0`, `v0.2.0`, …) on the dist repo.
+- Each release is an immutable tag (`v0.1.0`, `v0.2.0`, `v0.3.0`, …) on the dist repo.
 - Pin an exact tag in `pubspec.yaml`; never track a branch.
 - To adopt a new version, bump `ref:` and run `flutter pub get`.
 - **Chat changes need no rebuild.** The onboarding chat loads live from our
@@ -352,6 +352,20 @@ Navigator.of(context).push(
   new permission, a new phone feature, or a change to the widget's own
   parameters. In that case: bump `ref:`, run `flutter pub get`, and
   rebuild/re-release your app as usual.
+
+### What's new in v0.3.0 (rebuild required)
+
+- **Location permission prompt:** the phone now asks for location permission
+  when the owner opens the location card.
+- **Blocked permission:** if the owner denied location for good, the card shows
+  a button that opens your app's page in the phone settings (or the phone's
+  location switch, if location is off), so the owner can allow it there.
+- **Faster map:** the map centres at once on the phone's last known position,
+  then moves to the exact position when the GPS fix arrives.
+
+No new permissions, platform settings or widget parameters. To update: set
+`ref: v0.3.0`, run `flutter pub get`, then rebuild and release your app.
+On v0.2.0 the onboarding still works, but without these three changes.
 
 ---
 

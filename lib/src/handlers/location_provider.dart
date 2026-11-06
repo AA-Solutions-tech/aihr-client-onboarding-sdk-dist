@@ -13,7 +13,8 @@ class DeviceFix {
   final double accuracy;
 }
 
-enum LocationFailure { permissionDenied, serviceDisabled, timeout, failed }
+/// `permissionBlocked`: denied for good (Android no longer shows the prompt); only the app settings can allow it.
+enum LocationFailure { permissionDenied, permissionBlocked, serviceDisabled, timeout, failed }
 
 class LocationUnavailable implements Exception {
   const LocationUnavailable(this.reason);
@@ -31,13 +32,19 @@ abstract class LocationProvider {
   double distanceMeters(DeviceFix from, DeviceFix to);
 }
 
-class GeolocatorLocationProvider implements LocationProvider {
+/// Optional: a provider that can also return the phone's last known position at once (no GPS wait).
+/// Used to centre the map as soon as the location card opens; a fresh fix follows.
+abstract class LastKnownLocation {
+  /// The last known position, or null when the phone has none. Asks for permission like [LocationProvider.currentFix].
+  Future<DeviceFix?> lastKnownFix();
+}
+
+class GeolocatorLocationProvider implements LocationProvider, LastKnownLocation {
   const GeolocatorLocationProvider({this.timeout = const Duration(seconds: 15)});
 
   final Duration timeout;
 
-  @override
-  Future<DeviceFix> currentFix() async {
+  Future<void> _ensureAllowed() async {
     if (!await Geolocator.isLocationServiceEnabled()) {
       throw const LocationUnavailable(LocationFailure.serviceDisabled);
     }
@@ -45,10 +52,25 @@ class GeolocatorLocationProvider implements LocationProvider {
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
     }
-    if (permission == LocationPermission.denied ||
-        permission == LocationPermission.deniedForever) {
+    if (permission == LocationPermission.deniedForever) {
+      throw const LocationUnavailable(LocationFailure.permissionBlocked);
+    }
+    if (permission == LocationPermission.denied) {
       throw const LocationUnavailable(LocationFailure.permissionDenied);
     }
+  }
+
+  @override
+  Future<DeviceFix?> lastKnownFix() async {
+    await _ensureAllowed();
+    final position = await Geolocator.getLastKnownPosition();
+    if (position == null) return null;
+    return DeviceFix(latitude: position.latitude, longitude: position.longitude, accuracy: position.accuracy);
+  }
+
+  @override
+  Future<DeviceFix> currentFix() async {
+    await _ensureAllowed();
     try {
       final position = await Geolocator.getCurrentPosition(
         locationSettings: LocationSettings(
